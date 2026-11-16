@@ -14,8 +14,14 @@ import pytest
 from kotoba import datasets, lookup
 from kotoba.cli import EXIT_NO_RESULTS, EXIT_OK, EXIT_USAGE, main
 from kotoba.langs import kaikki
-from kotoba.langs.spanish import LookupError, Spanish
+from kotoba.langs.spanish import (
+    LookupError,
+    Spanish,
+    _entry_from_row,
+    _reading_from_sounds,
+)
 from kotoba.model import Entry, LookupResult, Sense
+from kotoba.render import render_text
 
 DATASET_ID = "kaikki-es"
 HOMEPAGE = "https://kaikki.org/dictionary/Spanish/"
@@ -26,7 +32,7 @@ SPANISH_ROWS = [
         "lang_code": "es",
         "pos": "intj",
         "senses": [{"glosses": ["hello", "hi"]}],
-        "sounds": [{"ipa": "/ˈola/"}],
+        "sounds": [{"ipa": "/ˈo.la/"}],
     },
     {
         "word": "gato",
@@ -139,7 +145,7 @@ def test_ingest_index_row_counts(spanish_data):
     assert senses == len(SPANISH_ROWS)
     assert hola[0] == "intj"
     assert json.loads(hola[1]) == ["hello", "hi"]
-    assert json.loads(hola[2]) == [{"type": "ipa", "value": "/ˈola/"}]
+    assert json.loads(hola[2]) == [{"type": "ipa", "value": "/ˈo.la/"}]
     assert json.loads(gato_forms) == [{"form": "gatos", "tags": ["plural"]}]
 
 
@@ -157,7 +163,7 @@ def test_search_exact_headword(spanish_data):
     assert [entry.headword for entry in result.entries] == ["hola"]
 
     entry = result.entries[0]
-    assert entry.reading is None
+    assert entry.reading == "/ˈo.la/"
     assert entry.source == "es"
     assert entry.senses[0].pos == ("intj",)
     assert entry.senses[0].glosses == ("hello", "hi")
@@ -179,9 +185,57 @@ def test_search_no_hit_is_empty(spanish_data):
     assert result.source == "es"
 
 
-def test_render_extras_removed(spanish_data):
-    from kotoba.langs.base import Language
-    assert Spanish.render_extras is Language.render_extras
+def test_render_ipa_reading(spanish_data):
+    result = Spanish().search("hola")
+
+    first = render_text(result).splitlines()[0]
+    assert first == "hola【/ˈo.la/】"
+
+
+def test_render_without_ipa_has_no_brackets(spanish_data):
+    text = render_text(Spanish().search("perro"))
+
+    assert text.splitlines()[0] == "perro"
+    assert "【" not in text
+    assert "】" not in text
+
+
+def _row_with_sounds(sounds_json: str | None) -> tuple:
+    return (1, "hola", "hola", "intj", '["hello"]', "[]", "[]", 1, sounds_json)
+
+
+@pytest.mark.parametrize(
+    "sounds_json",
+    [
+        "[]",
+        None,
+        '[{"type": "rhyme", "value": "-ola"}]',
+        '[{"type": "ipa", "value": ""}]',
+        "[",
+        '{"type": "ipa", "value": "/ˈo.la/"}',
+        '["/ˈo.la/"]',
+        "[null]",
+    ],
+)
+def test_reading_none_without_usable_ipa(spanish_data, sounds_json):
+    row = _row_with_sounds(sounds_json)
+
+    assert _reading_from_sounds(row) is None
+    entry = _entry_from_row(row, HOMEPAGE)
+    assert entry is not None
+    assert entry.reading is None
+    text = render_text(LookupResult(query="hola", source="es", entries=(entry,)))
+    assert "【" not in text
+    assert "】" not in text
+
+
+def test_reading_takes_first_ipa(spanish_data):
+    row = _row_with_sounds(
+        '[{"type": "rhyme", "value": "-ola"}, {"type": "ipa", "value": "/ˈo.la/"},'
+        ' {"type": "ipa", "value": "/ˈola/"}]'
+    )
+
+    assert _reading_from_sounds(row) == "/ˈo.la/"
 
 
 def test_search_not_installed(empty_data):
@@ -277,6 +331,13 @@ def test_cli_es_print(spanish_data, capsys):
     out = capsys.readouterr().out
     assert "hola" in out
     assert "hello" in out
+
+
+def test_cli_es_json_carries_reading(spanish_data, capsys):
+    assert main(["es", "hola", "--print", "--json"]) == EXIT_OK
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["entries"][0]["reading"] == "/ˈo.la/"
 
 
 def test_cli_alias_sp_print(spanish_data, capsys):

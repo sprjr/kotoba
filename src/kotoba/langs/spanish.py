@@ -13,7 +13,7 @@ from kotoba.model import Entry, LookupResult, Sense
 DATASET_ID = "kaikki-es"
 DEFAULT_LIMIT = 12
 
-_COLUMNS = "id, headword, lemma, pos, glosses, forms, tags, sense_count"
+_COLUMNS = "id, headword, lemma, pos, glosses, forms, tags, sense_count, sounds"
 
 
 class LookupError(Exception):
@@ -73,6 +73,19 @@ def _search_ids(con: sqlite3.Connection, query: str, limit: int) -> list[int]:
     return ordered[:limit]
 
 
+def _reading_from_sounds(row: tuple) -> str | None:
+    try:
+        sounds = json.loads(row[8] or "[]")
+    except (TypeError, json.JSONDecodeError):
+        return None
+    if not isinstance(sounds, list):
+        return None
+    for item in sounds:
+        if isinstance(item, dict) and item.get("type") == "ipa" and item.get("value"):
+            return str(item["value"])
+    return None
+
+
 def _entry_from_row(row: tuple, homepage: str | None) -> Entry | None:
     headword, pos, glosses_raw, tags_raw = row[1], row[3], row[4], row[6]
     try:
@@ -93,7 +106,7 @@ def _entry_from_row(row: tuple, homepage: str | None) -> Entry | None:
     )
     return Entry(
         headword=headword or "",
-        reading=None,
+        reading=_reading_from_sounds(row),
         senses=(sense,),
         tags=tuple(str(tag) for tag in tags),
         url=homepage or "",
