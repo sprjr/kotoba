@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import html
 import tempfile
 import zipfile
 from pathlib import Path
-from unittest import mock
 
 import pytest
 

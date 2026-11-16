@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from kotoba import config, datasets, langs, localdict
-from kotoba.model import Entry, LookupResult, Sense
+from kotoba.model import LookupResult
 
 
 class LookupError(Exception):
