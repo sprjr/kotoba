@@ -13,11 +13,14 @@
         kotoba = pkgs.callPackage ./package.nix { };
       in
       {
-        packages = {
-          default = kotoba;
-          kotoba = kotoba;
-          container = pkgs.callPackage ./container.nix { inherit kotoba; };
-        };
+        packages =
+          {
+            default = kotoba;
+            kotoba = kotoba;
+          }
+          // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+            container = pkgs.callPackage ./container.nix { inherit kotoba; };
+          };
 
         apps.default = {
           type = "app";
@@ -25,12 +28,14 @@
         };
 
         devShells.default = pkgs.mkShell {
-          packages = with pkgs; [
-            (python3.withPackages (ps: with ps; [ textual httpx pytest pytest-asyncio ]))
-            wordnet
-            wl-clipboard
-            uv
-          ];
+          packages =
+            with pkgs;
+            [
+              (python3.withPackages (ps: with ps; [ textual httpx pytest pytest-asyncio ]))
+              wordnet
+              uv
+            ]
+            ++ lib.optionals stdenv.hostPlatform.isLinux [ wl-clipboard ];
         };
 
         checks = {
