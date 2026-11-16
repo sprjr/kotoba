@@ -42,6 +42,7 @@ from kotoba.lookup import (
     reindex as reindex_datasets,
     update as update_datasets,
 )
+from kotoba.langs import all_languages, for_code as lang_for_code
 from kotoba.model import Entry, LookupResult
 from kotoba.render import render_error, render_text
 
@@ -52,12 +53,7 @@ EXIT_USAGE = 64
 
 Source = str
 
-ALIASES = {
-    "jp": "jisho",
-    "jisho": "jisho",
-    "en": "wordnet",
-    "wordnet": "wordnet",
-}
+_FIXED_COMMANDS = ("list", "dict", "kanji")
 
 _KANA = range(0x3040, 0x3100)
 _KANJI = range(0x4E00, 0xA000)
@@ -71,12 +67,15 @@ def _with_source(argv: list[str]) -> list[str]:
     for index, token in enumerate(argv):
         if token in ("-h", "--help"):
             return argv
-        if token in ("jp", "en", "list", "dict", "kanji") or token.startswith("list-"):
+        if token in _FIXED_COMMANDS or token.startswith("list-"):
             return argv
         if not token.startswith("-"):
-            if token in ALIASES:
-                return argv
-            picked = "jp" if _looks_japanese(token) else "en"
+            language = lang_for_code(token)
+            if language is not None:
+                if language.code == token:
+                    return argv
+                return argv[:index] + [language.code] + argv[index + 1 :]
+            picked = "jisho" if _looks_japanese(token) else "wordnet"
             return argv[:index] + [picked] + argv[index:]
     return argv
 
@@ -85,6 +84,7 @@ EPILOG = """\
 examples:
   kotoba 猫                  open the pager for a Japanese word
   kotoba love -p             WordNet, plain text to stdout
+  kotoba es hola -p          Spanish, plain text to stdout
   kotoba 猫 --json --limit 3 structured output for scripts
   kotoba jp --selection -p   look up the primary selection
   kotoba list add 猫 -l jp   save first Jisho result to a list
@@ -113,9 +113,7 @@ def _version() -> str:
 
 
 def _lookup(source: Source, query: str, limit: int | None):
-    from kotoba import langs
-
-    return langs.get(source).api_search(query, limit=limit)
+    return resolve_lookup(source, query, limit)
 
 
 def _as_json(result: LookupResult) -> str:
@@ -190,7 +188,7 @@ def _entry_with_meta(entry: Entry, result: LookupResult) -> Entry:
 
 
 def _cmd_list_add(args) -> int:
-    source = ALIASES.get(args.source, "jisho")
+    source = lang_for_code(args.source).code if lang_for_code(args.source) is not None else args.source
     if not args.query:
         sys.stderr.write("kotoba list add: missing QUERY\n")
         return EXIT_USAGE
@@ -328,7 +326,7 @@ def _build_list_parser(sub) -> argparse.ArgumentParser:
     add = sub_list.add_parser("add", help="add the first lookup result to a list")
     add.add_argument("query", help="word to look up")
     add.add_argument("-l", "--list", default="default", help="target list (default: default)")
-    add.add_argument("--source", choices=["jp", "en"], default="jp", help="lookup source")
+    add.add_argument("--source", choices=sorted({language.code for language in all_languages()} | {"jisho", "wordnet", "jp", "en"}), default="jisho", help="lookup source")
     add.add_argument("--limit", type=int, default=None, metavar="N", help="maximum results to consider")
 
     rm = sub_list.add_parser("rm", help="remove an entry from a list")
@@ -407,9 +405,18 @@ def _build_parser() -> _Parser:
     )
     parser.add_argument("--version", action="version", version=f"kotoba {_version()}")
     parser.add_argument("--offline", action="store_true", help="force local-only lookup")
-    sub = parser.add_subparsers(dest="command", required=True, metavar="{jp,en,list,dict,kanji}")
-    for name, label in (("jp", "Jisho"), ("en", "WordNet")):
-        p = sub.add_parser(name, help=f"search {label}", description=f"Search {label}.")
+    choices = sorted(
+        {language.code for language in all_languages()}
+        | {alias for language in all_languages() for alias in language.aliases}
+        | set(_FIXED_COMMANDS)
+    )
+    sub = parser.add_subparsers(dest="command", required=True, metavar="{" + ",".join(choices) + "}")
+    for language in all_languages():
+        p = sub.add_parser(
+            language.code,
+            help=f"search {language.name}",
+            description=f"Search {language.name}.",
+        )
         p.add_argument("query", nargs="?", default="", help="word to look up (omit to type in the TUI)")
         p.add_argument("--selection", action="store_true", help="use primary selection, then clipboard, as the query")
         p.add_argument("-p", "--print", action="store_true", dest="print_only", help="plain text output, no TUI")
@@ -665,7 +672,8 @@ def main(argv: list[str] | None = None) -> int:
 
     limit = args.limit if args.limit and args.limit > 0 else None
     query = selection.initial_query(args.query or None, use_selection=args.selection)
-    source = ALIASES[args.command]
+    language = lang_for_code(args.command)
+    source = language.code if language is not None else args.command
     if not (args.print_only or args.as_json) and sys.stdout.isatty():
         from kotoba.app import run_app
 

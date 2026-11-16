@@ -3,6 +3,7 @@ from __future__ import annotations
 from kotoba.langs.base import Language
 from kotoba.langs.english import English
 from kotoba.langs.japanese import Japanese
+from kotoba.langs.spanish import Spanish
 
 _REGISTRY: dict[str, Language] = {}
 _ALIASES: dict[str, str] = {}
@@ -16,6 +17,7 @@ def _register(language: Language) -> None:
 
 _register(Japanese())
 _register(English())
+_register(Spanish())
 
 
 def get(code: str) -> Language:
