@@ -8,15 +8,13 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
-from textual.widgets import Button, Input, Static
+from textual.widgets import Input, Static
 import threading
 
-from kotoba.config import ask_at_startup, load as load_config, mode as config_mode, onboarding_done, save as save_config, set_mode
+from kotoba.config import ask_at_startup, load as load_config, mode as config_mode, onboarding_done, set_mode
 from kotoba.datasets import (
     descriptor,
-    download_size_notice,
     format_size,
-    installed_meta,
     pending_download_notice,
 )
 from kotoba.export import export_list

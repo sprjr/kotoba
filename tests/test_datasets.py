@@ -10,7 +10,7 @@ from typing import Callable
 
 import pytest
 
-from kotoba import datasets, localdict
+from kotoba import datasets
 
 
 def _make_tgz_json(dest: Path, member_name: str, payload: dict | list) -> None:

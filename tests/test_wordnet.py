@@ -1,6 +1,5 @@
 import pytest
 
-from kotoba.model import Entry, LookupResult, Sense
 from kotoba.wordnet import LookupError, _parse, fetch
 
 LOVE_NOUN_FIXTURE = """\n

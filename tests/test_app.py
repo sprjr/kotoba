@@ -21,7 +21,7 @@ def _fake_fetch(monkeypatch, source, entries):
 async def test_app_opens_query_screen_with_empty_query(monkeypatch):
     _fake_fetch(monkeypatch, "jisho", ())
     monkeypatch.setenv("XDG_CONFIG_HOME", "/tmp/kotoba-test-empty")
-    import tempfile, shutil
+    import shutil
     cfg = "/tmp/kotoba-test-empty/kotoba"
     shutil.rmtree(cfg, ignore_errors=True)
     os.makedirs(cfg, exist_ok=True)
@@ -30,7 +30,7 @@ async def test_app_opens_query_screen_with_empty_query(monkeypatch):
     c["onboarding_done"] = True
     save(c)
     app = KotobaApp("jisho", "")
-    async with app.run_test() as pilot:
+    async with app.run_test():
         assert isinstance(app.screen, QueryScreen)
         assert app.screen.query_one("#query", Input).value == ""
 
