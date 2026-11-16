@@ -179,9 +179,9 @@ def test_search_no_hit_is_empty(spanish_data):
     assert result.source == "es"
 
 
-def test_render_extras_single_ipa(spanish_data):
-    result = Spanish().search("hola")
-    assert Spanish().render_extras(result.entries[0]) == {"ipa": "/ˈola/"}
+def test_render_extras_removed(spanish_data):
+    from kotoba.langs.base import Language
+    assert Spanish.render_extras is Language.render_extras
 
 
 def test_search_not_installed(empty_data):
@@ -190,8 +190,9 @@ def test_search_not_installed(empty_data):
         Spanish().search("hola")
 
 
-def test_local_search_not_installed_returns_none(empty_data):
-    assert Spanish().local_search("hola") is None
+def test_local_search_not_installed_raises(empty_data):
+    with pytest.raises(LookupError, match="spanish dataset not installed"):
+        Spanish().local_search("hola")
 
 
 # --------------------------------------------------------------------------- #
@@ -261,19 +262,11 @@ def test_offline_flag_is_local_only(spanish_data, monkeypatch):
     assert [entry.headword for entry in result.entries] == ["gato"]
 
 
-def test_local_only_without_dataset_uses_api(empty_data, monkeypatch):
-    calls = []
+def test_local_only_without_dataset_surfaces_spanish_error(empty_data, monkeypatch):
+    from kotoba.lookup import LookupError as ModeError
 
-    def fake_api_search(query, *, limit=None):
-        calls.append(query)
-        return _fake_api_result(query)
-
-    monkeypatch.setattr(lookup.langs.get("es"), "api_search", fake_api_search)
-    result = lookup.lookup("es", "hola", 5, mode="local-only")
-
-    assert result.entries[0].senses[0].glosses == ("from-api",)
-    assert calls == ["hola"]
-
+    with pytest.raises(ModeError, match="spanish dataset not installed"):
+        lookup.lookup("es", "hola", 5, mode="local-only")
 
 # --------------------------------------------------------------------------- #
 # CLI

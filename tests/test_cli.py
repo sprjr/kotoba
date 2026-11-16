@@ -423,3 +423,49 @@ def test_offline_missing_data_reports_once(monkeypatch, tmp_path, capsys):
     err = capsys.readouterr().err
     assert err.count("local dictionary not installed") == 1
 
+
+def test_spanish_offline_missing_dataset_single_error_and_exit_code(monkeypatch, tmp_path, capsys):
+    """Regression for Spanish --offline with no kaikki-es dataset."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    rc = main(["es", "hola", "--print", "--offline"])
+    err = capsys.readouterr().err
+    assert rc == EXIT_NO_RESULTS
+    assert err.count("spanish dataset not installed") == 1
+    assert "api:" not in err
+    assert "local dictionary not installed" not in err
+
+
+def test_spanish_online_missing_dataset_no_api_prefix(monkeypatch, tmp_path, capsys):
+    """Regression for Spanish online with no kaikki-es dataset."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    rc = main(["es", "hola", "--print"])
+    err = capsys.readouterr().err
+    assert rc == EXIT_NO_RESULTS
+    assert err.count("spanish dataset not installed") == 1
+    assert "api:" not in err
+
+
+def test_spanish_and_japanese_missing_dataset_share_exit_code(monkeypatch, tmp_path, capsys):
+    """Both no-dataset failures should use the same documented exit code."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    assert main(["es", "hola", "--print"]) == EXIT_NO_RESULTS
+    assert main(["es", "hola", "--print", "--offline"]) == EXIT_NO_RESULTS
+
+
+def test_offline_prompt_scoped_to_japanese(monkeypatch, tmp_path, capsys):
+    """Spanish --offline should not print the JMdict download prompt."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    main(["es", "hola", "--print", "--offline"])
+    err = capsys.readouterr().err
+    assert "JMdict" not in err
+    assert "jmdict" not in err
+    assert "download now" not in err
+    assert "continuing with API lookup" not in err

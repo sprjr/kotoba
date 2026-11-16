@@ -73,11 +73,20 @@ def lookup(source: Source, query: str, limit: int | None, *, mode: config.Config
     if mode == "api-only":
         return _api_lookup(source, query, limit)
 
-    local_result = language.local_search(query, limit or 12)
+    try:
+        local_result = language.local_search(query, limit or 12)
+    except Exception as exc:
+        # Local backend is the only backend for this source; surface its own message.
+        local_err = exc
+        local_result = None
+    else:
+        local_err = None
 
     if mode == "local-only":
         if local_result is not None:
             return local_result
+        if local_err is not None:
+            raise LookupError(str(local_err))
         return _api_lookup(source, query, limit)
 
     # local-first: prefer a local hit, otherwise fall through to the API.
@@ -87,7 +96,9 @@ def lookup(source: Source, query: str, limit: int | None, *, mode: config.Config
     try:
         return _api_lookup(source, query, limit)
     except Exception as exc:
-        raise LookupError(_merge_error(None, exc)) from exc
+        if local_err is not None:
+            raise LookupError(str(local_err)) from exc
+        raise LookupError(str(exc)) from exc
 
 
 def kanji(literal: str) -> dict | None:

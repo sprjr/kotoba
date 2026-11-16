@@ -13,7 +13,7 @@ from kotoba.model import Entry, LookupResult, Sense
 DATASET_ID = "kaikki-es"
 DEFAULT_LIMIT = 12
 
-_COLUMNS = "id, headword, lemma, pos, glosses, forms, sounds, tags, sense_count"
+_COLUMNS = "id, headword, lemma, pos, glosses, forms, tags, sense_count"
 
 
 class LookupError(Exception):
@@ -74,7 +74,7 @@ def _search_ids(con: sqlite3.Connection, query: str, limit: int) -> list[int]:
 
 
 def _entry_from_row(row: tuple, homepage: str | None) -> Entry | None:
-    headword, pos, glosses_raw, tags_raw = row[1], row[3], row[4], row[7]
+    headword, pos, glosses_raw, tags_raw = row[1], row[3], row[4], row[6]
     try:
         glosses = json.loads(glosses_raw or "[]")
     except (TypeError, json.JSONDecodeError):
@@ -101,16 +101,6 @@ def _entry_from_row(row: tuple, homepage: str | None) -> Entry | None:
     )
 
 
-def _trivial_ipa(sounds: object) -> str | None:
-    if isinstance(sounds, list) and len(sounds) == 1:
-        item = sounds[0]
-        if isinstance(item, dict) and item.get("type") == "ipa":
-            value = item.get("value")
-            if isinstance(value, str) and value:
-                return value
-    return None
-
-
 class Spanish(Language):
     code = "es"
     name = "Spanish"
@@ -125,9 +115,9 @@ class Spanish(Language):
         try:
             con = _connect(required=False)
         except LookupError:
-            return None
+            raise
         if con is None:
-            return None
+            raise LookupError("spanish dataset not installed")
         homepage = _homepage()
         try:
             ids = _search_ids(con, query, cap)
@@ -159,27 +149,3 @@ class Spanish(Language):
 
     def api_search(self, query: str, *, limit: int | None = None) -> LookupResult:
         return self.search(query, limit=limit)
-
-    def render_extras(self, entry: Entry) -> dict:
-        con = _connect(required=False)
-        if con is None:
-            return {}
-        try:
-            rows = con.execute(
-                "SELECT sounds FROM entries WHERE headword = ? COLLATE NOCASE",
-                (entry.headword,),
-            ).fetchall()
-        except sqlite3.Error:
-            return {}
-        finally:
-            con.close()
-
-        payloads = {row[0] or "[]" for row in rows}
-        if len(payloads) != 1:
-            return {}
-        try:
-            sounds = json.loads(payloads.pop())
-        except json.JSONDecodeError:
-            return {}
-        ipa = _trivial_ipa(sounds)
-        return {"ipa": ipa} if ipa else {}

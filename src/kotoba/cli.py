@@ -31,7 +31,6 @@ from kotoba.lists import (
     remove_entry,
     save,
 )
-from kotoba.localdict import installed as localdict_installed
 from kotoba.lookup import (
     LookupError as LookupModeError,
     install_datasets,
@@ -142,24 +141,26 @@ def _print_result(source: Source, query: str, limit: int | None, as_json: bool, 
         print("kotoba: empty query", file=sys.stderr)
         return EXIT_USAGE
 
-    # --offline with no local data: hint, optionally offer download, then continue with API if declined
-    if offline and not localdict_installed():
-        sys.stderr.write("local dictionary not installed (kotoba dict install)\n")
-        if sys.stdin.isatty():
-            sys.stderr.write("download now? [y/N] ")
-            sys.stderr.flush()
-            try:
-                answer = sys.stdin.readline().strip().lower()
-            except (OSError, KeyboardInterrupt):
-                answer = "n"
-            if answer in ("y", "yes"):
+    # --offline with no local data: hint and offer download only for Japanese, which has a downloadable local dictionary and a remote API fallback.
+    if offline:
+        language = lang_for_code(source)
+        if language is not None and source == "jisho" and not any(installed_meta(dataset) for dataset in language.datasets()):
+            sys.stderr.write("local dictionary not installed (kotoba dict install)\n")
+            if sys.stdin.isatty():
+                sys.stderr.write("download now? [y/N] ")
+                sys.stderr.flush()
                 try:
-                    install_datasets([], all_=True)
-                except Exception as exc:
-                    sys.stderr.write(f"kotoba: download failed: {exc}\n")
-            else:
-                sys.stderr.write("continuing with API lookup\n")
-        # fall through to API if declined or download failed
+                    answer = sys.stdin.readline().strip().lower()
+                except (OSError, KeyboardInterrupt):
+                    answer = "n"
+                if answer in ("y", "yes"):
+                    try:
+                        install_datasets([], all_=True)
+                    except Exception as exc:
+                        sys.stderr.write(f"kotoba: download failed: {exc}\n")
+                else:
+                    sys.stderr.write("continuing with API lookup\n")
+            # fall through to API if declined or download failed
 
     try:
         result = resolve_lookup(source, query, limit, offline=offline)
@@ -188,7 +189,8 @@ def _entry_with_meta(entry: Entry, result: LookupResult) -> Entry:
 
 
 def _cmd_list_add(args) -> int:
-    source = lang_for_code(args.source).code if lang_for_code(args.source) is not None else args.source
+    language = lang_for_code(args.source)
+    source = language.code if language is not None else args.source
     if not args.query:
         sys.stderr.write("kotoba list add: missing QUERY\n")
         return EXIT_USAGE
@@ -326,7 +328,15 @@ def _build_list_parser(sub) -> argparse.ArgumentParser:
     add = sub_list.add_parser("add", help="add the first lookup result to a list")
     add.add_argument("query", help="word to look up")
     add.add_argument("-l", "--list", default="default", help="target list (default: default)")
-    add.add_argument("--source", choices=sorted({language.code for language in all_languages()} | {"jisho", "wordnet", "jp", "en"}), default="jisho", help="lookup source")
+    add.add_argument(
+        "--source",
+        choices=sorted(
+            {language.code for language in all_languages()}
+            | {"jisho", "wordnet", "jp", "en"}
+        ),
+        default="jisho",
+        help="lookup source",
+    )
     add.add_argument("--limit", type=int, default=None, metavar="N", help="maximum results to consider")
 
     rm = sub_list.add_parser("rm", help="remove an entry from a list")
@@ -399,7 +409,7 @@ def _build_dict_parser(sub) -> argparse.ArgumentParser:
 def _build_parser() -> _Parser:
     parser = _Parser(
         prog="kotoba",
-        description="Dictionary pager for Jisho and WordNet",
+        description="Dictionary pager for Jisho, WordNet, and Spanish",
         epilog=EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
