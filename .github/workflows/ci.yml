@@ -19,9 +19,9 @@ jobs:
         python: ["3.11", "3.12", "3.13"]
     runs-on: ${{ matrix.os }}
     env:
-      XDG_DATA_HOME: ${{ runner.temp }}/xdg/data
-      XDG_CACHE_HOME: ${{ runner.temp }}/xdg/cache
-      XDG_CONFIG_HOME: ${{ runner.temp }}/xdg/config
+      XDG_DATA_HOME: ${{ github.workspace }}/../ci-xdg/data
+      XDG_CACHE_HOME: ${{ github.workspace }}/../ci-xdg/cache
+      XDG_CONFIG_HOME: ${{ github.workspace }}/../ci-xdg/config
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
