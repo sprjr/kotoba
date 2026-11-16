@@ -1,11 +1,9 @@
-import json
-from pathlib import Path
 
 import httpx
 import pytest
 
 from kotoba.jisho import LookupError, fetch
-from kotoba.model import Entry, LookupResult, Sense
+from kotoba.model import Entry, Sense
 
 
 NEKO_FIXTURE = {

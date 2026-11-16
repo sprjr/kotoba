@@ -1,4 +1,3 @@
-import sys
 from unittest import mock
 
 import pytest
@@ -141,7 +140,6 @@ def test_empty_query_returns_usage(capsys):
 
 
 def test_help_exits_zero(capsys):
-    import pytest
 
     with pytest.raises(SystemExit) as exc:
         main(["-h"])
@@ -152,7 +150,6 @@ def test_help_exits_zero(capsys):
 
 
 def test_subcommand_help(capsys):
-    import pytest
 
     with pytest.raises(SystemExit) as exc:
         main(["jp", "-h"])
@@ -162,7 +159,6 @@ def test_subcommand_help(capsys):
 
 
 def test_version_flag(capsys):
-    import pytest
 
     with pytest.raises(SystemExit) as exc:
         main(["--version"])
@@ -171,7 +167,6 @@ def test_version_flag(capsys):
 
 
 def test_no_args_is_usage_error(capsys):
-    import pytest
 
     with pytest.raises(SystemExit) as exc:
         main([])
@@ -180,7 +175,6 @@ def test_no_args_is_usage_error(capsys):
 
 
 def test_unknown_flag_is_usage_error(capsys):
-    import pytest
 
     with pytest.raises(SystemExit) as exc:
         main(["--nope"])
@@ -275,7 +269,6 @@ def test_list_rm_list_requires_yes(monkeypatch, tmp_path):
 
 
 def test_list_help_shows_subcommands(capsys):
-    import pytest
 
     with pytest.raises(SystemExit) as exc:
         main(["list", "-h"])
@@ -285,7 +278,6 @@ def test_list_help_shows_subcommands(capsys):
 
 def test_dict_status_shows_total_and_json_fields(monkeypatch, tmp_path, capsys):
     import json as _json
-    from kotoba import localdict
 
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     data_dir = tmp_path / "kotoba" / "dict"

@@ -6,9 +6,7 @@ import sys
 import textwrap
 from pathlib import Path
 
-from kotoba.config import ConfigError, ConfigMode
 from kotoba.datasets import (
-    CACHE_SIZE_THRESHOLD,
     clear_download_cache,
     dataset_attribution_block,
     descriptor,
@@ -16,7 +14,6 @@ from kotoba.datasets import (
     installed_meta,
     install_exceeds_threshold,
     known_ids,
-    pending_download_notice,
 )
 from kotoba.export import export_list
 from kotoba.lists import (
@@ -303,7 +300,6 @@ def _cmd_list_export(args) -> int:
         sys.stderr.write(f"kotoba: list '{args.list}' not found\n")
         return EXIT_NO_RESULTS
 
-    from kotoba.lists import entry_from_dict
 
     entries = [entry_from_dict(item) for item in data["entries"]]
     output_dir = Path(args.output) if args.output else None

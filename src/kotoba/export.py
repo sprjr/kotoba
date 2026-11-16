@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from kotoba.model import Entry, Sense
+from kotoba.model import Entry
 
 if TYPE_CHECKING:
     import genanki

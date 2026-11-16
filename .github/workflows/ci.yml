@@ -1,0 +1,94 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.11", "3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    env:
+      XDG_DATA_HOME: ${{ github.workspace }}/../ci-xdg/data
+      XDG_CACHE_HOME: ${{ github.workspace }}/../ci-xdg/cache
+      XDG_CONFIG_HOME: ${{ github.workspace }}/../ci-xdg/config
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen --group test --python ${{ matrix.python }}
+      - run: uv run --frozen --no-sync pytest
+      - name: console script smoke
+        run: |
+          uv run --frozen --no-sync kotoba --help
+          uv run --frozen --no-sync kotoba es --help
+
+  wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv build
+      - run: uv venv /tmp/clean
+      - run: uv pip install --python /tmp/clean/bin/python dist/*.whl
+      - name: entrypoint works with declared deps only
+        run: |
+          /tmp/clean/bin/kotoba --help
+          if /tmp/clean/bin/kotoba es hola; then
+            echo "expected exit 1 for missing dataset"
+            exit 1
+          fi
+
+  nix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - uses: nix-community/cache-nix-action@v6
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock', '**/uv.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+      - run: nix build .#default --print-build-logs --no-link
+      - run: nix flake check --print-build-logs
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - uses: nix-community/cache-nix-action@v6
+        with:
+          primary-key: nix-container-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+          restore-prefixes-first-match: nix-container-
+      - run: nix build .#container --print-build-logs
+      - run: docker load < result
+      - run: docker run --rm kotoba --help
+
+  lint:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uvx ruff check --select F,E9 src tests
