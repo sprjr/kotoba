@@ -147,3 +147,16 @@ to the API.
 The local SQLite indices are derivative works of CC BY-SA 4.0 data. This
 application does not distribute them; if you share a generated index, the
 share-alike obligation applies. See `NOTICE` for the full attribution text.
+
+## Other languages
+
+Spanish lookups (`es`, alias `sp`) read a local Kaikki/Wiktextract index:
+
+```
+kotoba dict install kaikki-es
+kotoba es hola --print
+```
+
+The archive is a few gigabytes, so `kaikki-es` is not part of `dict install
+--all`; install it by name. Licence and attribution text for the dataset is
+printed by `kotoba dict notice kaikki-es`.

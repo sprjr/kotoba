@@ -48,7 +48,7 @@ class QueryScreen(Screen):
         super().__init__()
         self.source = source
         self.query_text = query
-        self._placeholder = "日本語" if source == "jisho" else "define"
+        self._placeholder = {"jisho": "日本語", "es": "escribe"}.get(source, "define")
         self.offline = offline
 
     def compose(self) -> ComposeResult:

@@ -27,6 +27,10 @@ class Language(ABC):
         """Live API lookup; defaults to :meth:`search` with offline=False."""
         return self.search(query, limit=limit, offline=False)
 
+    def local_search(self, query: str, limit: int | None = None) -> LookupResult | None:
+        """Query a locally installed index; None when the language has none."""
+        return None
+
     def render_extras(self, entry: Entry) -> dict:
         """Return language-specific rendering hints for an entry."""
         return {}

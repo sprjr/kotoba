@@ -42,34 +42,63 @@ def lookup(source: Source, query: str, limit: int | None, *, mode: config.Config
     if mode is None:
         mode = "local-only" if offline else config.mode()
 
-    if source != "jisho":
-        # English queries never touch local JMdict index
+    if source == "jisho":
+        has_data = _local_available()
+        local_err: Exception | None = None
+
+        if mode == "api-only" or (not has_data and mode in ("local-first", "local-only")):
+            return _api_lookup(source, query, limit)
+
+        if mode == "local-only":
+            result = _local_lookup(query, limit or 12)
+            if result.entries:
+                return result
+            raise LookupError("not in local dictionary")
+
+        # local-first
+        try:
+            result = _local_lookup(query, limit or 12)
+            if result.entries:
+                return result
+        except Exception as exc:
+            local_err = exc
+
+        try:
+            return _api_lookup(source, query, limit)
+        except Exception as exc:
+            raise LookupError(_merge_error(local_err, exc)) from exc
+
+    language = langs.get(source)
+
+    if mode == "api-only":
         return _api_lookup(source, query, limit)
 
-    has_data = _local_available()
-    local_err: Exception | None = None
-
-    if mode == "api-only" or (not has_data and mode in ("local-first", "local-only")):
-        return _api_lookup(source, query, limit)
+    try:
+        local_result = language.local_search(query, limit or 12)
+    except Exception as exc:
+        # Local backend is the only backend for this source; surface its own message.
+        local_err = exc
+        local_result = None
+    else:
+        local_err = None
 
     if mode == "local-only":
-        result = _local_lookup(query, limit or 12)
-        if result.entries:
-            return result
-        raise LookupError("not in local dictionary")
+        if local_result is not None:
+            return local_result
+        if local_err is not None:
+            raise LookupError(str(local_err))
+        return _api_lookup(source, query, limit)
 
-    # local-first
-    try:
-        result = _local_lookup(query, limit or 12)
-        if result.entries:
-            return result
-    except Exception as exc:
-        local_err = exc
+    # local-first: prefer a local hit, otherwise fall through to the API.
+    if local_result is not None and local_result.entries:
+        return local_result
 
     try:
         return _api_lookup(source, query, limit)
     except Exception as exc:
-        raise LookupError(_merge_error(local_err, exc)) from exc
+        if local_err is not None:
+            raise LookupError(str(local_err)) from exc
+        raise LookupError(str(exc)) from exc
 
 
 def kanji(literal: str) -> dict | None:
